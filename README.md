@@ -1,135 +1,92 @@
 # COPD Screener — GSK Demo
 
-An AI-powered COPD screening tool for family doctors, built for the GSK demo.
-It flags patients at risk of COPD before spirometry and includes a separate patient questionnaire.
+An AI tool that helps family doctors identify patients at risk of COPD before spirometry.
 
 ---
 
-## What you need before starting
+## How to run it
 
-- A Mac or Windows computer
-- **Python 3.10 or newer** — check by opening Terminal and typing `python3 --version`
-  - If you don't have it: download from [python.org](https://www.python.org/downloads/)
-- The project folder on your computer (the one containing `app.py`)
+### Step 1 — Make sure you have Python
+
+Open **Terminal** (Mac) or **Command Prompt** (Windows) and type:
+```
+python3 --version
+```
+If you see a version number like `Python 3.12.0` you're good. If not, download Python from [python.org](https://www.python.org/downloads/) and install it, then come back here.
 
 ---
 
-## First-time setup (do this once)
+### Step 2 — Download the project
 
-Open **Terminal** (Mac) or **Command Prompt** (Windows), then run these commands one at a time.
+Click the green **Code** button at the top of this GitHub page → **Download ZIP** → unzip it somewhere on your computer (e.g. your Desktop).
 
-**1. Go to the project folder**
+---
+
+### Step 3 — Install the required packages
+
+In Terminal, navigate to the unzipped folder:
 ```
-cd /Users/elsaleksandra/GSKIE
+cd ~/Desktop/COPD-prediction-main
 ```
-> ⚠️ Change the path above to wherever you saved the project folder.
+> If you saved it somewhere else, replace the path above accordingly.
 
-**2. Install the required Python packages**
+Then run:
 ```
 pip3 install -r requirements.txt
 ```
-This takes 1–2 minutes and only needs to be done once.
-
-**3. Train the model** (also only once — or after any code changes)
-```
-python3 train_model.py
-python3 train_severity_model.py
-```
-You should see output ending in `Done.` for each. This creates the model files in the `models/` folder.
+This takes 1–2 minutes. You only need to do it once.
 
 ---
 
-## Running the app
-
-Every time you want to open the demo, run:
+### Step 4 — Start the app
 
 ```
 python3 -m streamlit run app.py
 ```
 
-Your browser will open automatically at **http://localhost:8501**.
-
-If it doesn't open automatically, copy that address into your browser manually.
+Your browser will open automatically at **http://localhost:8501**. That's it — no further setup needed.
 
 To stop the app, press `Ctrl + C` in the Terminal.
 
 ---
 
-## What's in the app
+## What you'll see
 
-| Page | Who it's for | What it does |
-|------|-------------|--------------|
-| **Worklist** (main page) | Doctor | List of today's patients with AI risk badges |
-| **Patient Chart** | Doctor | Full EHR view with AI risk score, SHAP explanations, GOLD severity estimate |
-| **Patient Form** | Patient | Mobile-friendly questionnaire (CAT score + symptoms) — no clinical jargon |
-| **Model Card** | Anyone | Full transparency on how the model works, its metrics, and its limitations |
+| Page | What it does |
+|------|-------------|
+| **Worklist** | Today's patients with colour-coded COPD risk badges |
+| **Patient Chart** | Full clinical view with AI risk score and explanation |
+| **Patient Form** | Patient-facing symptom questionnaire (no medical jargon) |
+| **Model Card** | How the AI works, its accuracy, and its limitations |
 
 ---
 
-## Navigating the demo
+## Quick demo walkthrough
 
-1. Open the app — you'll see the **doctor worklist** with 6 demo patients
-2. Click **Open Chart** on any patient to see their full EHR + AI risk widget
-3. For flagged patients, click **📩 Send Patient Form** to open the patient questionnaire
-4. After the patient submits the form, the doctor's risk score updates automatically
-5. Click **Model Card** in the sidebar to see full model statistics
+1. You'll land on the **doctor worklist** — 6 demo patients with risk levels
+2. Click **Open Chart** on any patient
+3. On flagged patients, click **📩 Send Patient Form** to open the patient questionnaire
+4. After the form is submitted, the risk score on the chart updates automatically
+5. Use the **sidebar** to switch between pages
 
 ---
 
 ## Troubleshooting
 
-**"Port 8501 is already in use"**
-Run this first, then try again:
+**"Port already in use" error**
 ```
 pkill -f streamlit
 ```
+Then start the app again.
 
 **"Module not found" error**
-Re-run the install step:
 ```
 pip3 install -r requirements.txt
 ```
 
-**"No such file or directory: models/xgb_model.pkl"**
-You need to train the model first:
-```
-python3 train_model.py
-python3 train_severity_model.py
-```
-
-**The browser opened but shows an error**
-Try refreshing the page. If it persists, stop the app (`Ctrl+C`) and restart it.
+**Browser didn't open automatically**
+Go to [http://localhost:8501](http://localhost:8501) manually.
 
 ---
 
-## Project structure (for reference)
-
-```
-GSKIE/
-├── app.py                        ← Doctor worklist (main page)
-├── pages/
-│   ├── 1_Patient_Chart.py        ← Doctor EHR chart view
-│   ├── 2_Patient_Form.py         ← Patient questionnaire
-│   └── 3_Model_Card.py           ← Model transparency page
-├── utils/
-│   ├── fake_patients.py          ← Demo patient records
-│   ├── preprocess.py             ← Feature engineering pipeline
-│   └── risk_update.py            ← Post-questionnaire risk update
-├── models/                       ← Saved model files (created after training)
-├── train_model.py                ← Main model training script
-├── train_severity_model.py       ← GOLD severity model training script
-├── requirements.txt              ← Python package list
-└── dataset.csv                   ← Kaggle COPD dataset (101 real patients)
-```
-
----
-
-## About the model
-
-The AI model uses **Logistic Regression** trained on:
-- 8,000 synthetic EHR patients (Spanish primary care simulation)
-- 101 real COPD patients from a public Kaggle dataset
-
-It is optimised for **high sensitivity (≥90%)** — meaning it is deliberately set to catch as many COPD cases as possible, even if that means some false alarms. False alarms lead to an unnecessary (but harmless) spirometry test; missed cases are more harmful.
-
-**This is a research prototype. It is not approved for clinical use.**
+> **Note:** This is a research prototype for demo purposes only. Not approved for clinical use.
