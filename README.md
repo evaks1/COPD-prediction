@@ -1,4 +1,4 @@
-# COPD Screener — GSK Demo
+# COPD Screener
 
 An AI tool that helps family doctors identify patients at risk of COPD before spirometry.
 
