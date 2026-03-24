@@ -61,6 +61,25 @@ To stop the app, press `Ctrl + C` in the Terminal.
 
 ---
 
+## Screenshots
+
+**Doctor worklist** — patients colour-coded by COPD risk, confirmed diagnoses clearly labelled
+![Doctor worklist](photos/DR_dashboard.png)
+
+**Patient chart** — AI risk score, gauge, GOLD severity estimate and recommendation
+![Patient chart](photos/Patientprofile_DRview_1.png)
+
+**Key contributing risk factors** — shows which clinical features are driving the score
+![Risk factors](photos/PatientProfile_DRview.png)
+
+**Patient questionnaire** — sent to the patient before their appointment, no medical jargon
+![Patient questionnaire](photos/PatientQuestionnaire.png)
+
+**Questionnaire confirmation** — patient summary with health tips while they wait
+![Completed questionnaire](photos/CompletedQuestionnaire.png)
+
+---
+
 ## Quick demo walkthrough
 
 1. You'll land on the **doctor worklist** — 6 demo patients with risk levels
