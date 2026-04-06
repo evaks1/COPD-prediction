@@ -13,7 +13,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.preprocess import FEATURE_LABELS, FEATURE_COLS
+from utils.preprocess import FEATURE_LABELS
 
 st.set_page_config(
     page_title="Model Card — COPD Screener AI",
@@ -25,29 +25,28 @@ st.set_page_config(
 # ── Load model ────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    base = os.path.dirname(os.path.dirname(__file__))
-    return (
-        joblib.load(os.path.join(base, "models", "xgb_model.pkl")),
-        joblib.load(os.path.join(base, "models", "threshold.pkl")),
-    )
+    base     = os.path.dirname(os.path.dirname(__file__))
+    artifact = joblib.load(os.path.join(base, "models", "copd_model_v2.pkl"))
+    return artifact["model"], artifact["threshold"], artifact["feature_names"]
 
-model, threshold = load_model()
+model, threshold, feature_names = load_model()
 
-# ── Pre-computed test-set metrics (from train_model.py output) ────────
-# Confusion matrix at optimised threshold: [[195, 1088], [65, 652]]
-TP, FP, TN, FN = 652, 1088, 195, 65
+# ── Pre-computed test-set metrics (Iteration 2 — copd_model_v2.pkl) ──
+# Test set: 1,990 patients (stratified 20% of 9,948) — 76.4% COPD+
+# Confusion matrix at optimised threshold (0.667):
+TP, FP, TN, FN = 1351, 388, 82, 169
 METRICS = {
-    "Sensitivity (Recall)": TP / (TP + FN),      # 90.9 %
-    "Specificity":           TN / (TN + FP),      # 15.2 %
-    "Precision (PPV)":       TP / (TP + FP),      # 37.5 %
-    "NPV":                   TN / (TN + FN),      # 75.0 %
-    "ROC-AUC":               0.6210,
-    "F1 Score":              2*TP / (2*TP + FP + FN),  # 0.53
+    "Sensitivity (Recall)": TP / (TP + FN),      # 88.9 %
+    "Specificity":           TN / (TN + FP),      # 17.5 %
+    "Precision (PPV)":       TP / (TP + FP),      # 77.7 %
+    "NPV":                   TN / (TN + FN),      # 32.7 %
+    "ROC-AUC":               0.586,
+    "F1 Score":              2*TP / (2*TP + FP + FN),  # 0.829
     "Accuracy":              (TP + TN) / (TP + TN + FP + FN),
 }
-TEST_N      = 2000
-TRAIN_N     = 8101   # 8000 synthetic + 101 Kaggle augmentation
-COPD_PREV   = 35.9   # % in derived label
+TEST_N      = 1990
+TRAIN_N     = 7958   # 9,948 synthetic patients, 80% train split
+COPD_PREV   = 76.4   # % in derived label (Strategy B, GOLD 2024)
 THRESHOLD   = threshold
 
 # ── CSS ──────────────────────────────────────────────────────────────
@@ -279,11 +278,16 @@ fi_col, param_col = st.columns([2, 1], gap="medium")
 
 with fi_col:
     st.markdown('<div class="card"><div class="card-title">📊 Feature Importance (|LR coefficient|)</div>', unsafe_allow_html=True)
-    if hasattr(model, "coef_"):
-        fi_vals = abs(model.coef_[0])
-    else:
-        fi_vals = model.feature_importances_
-    fi_series = pd.Series(fi_vals, index=FEATURE_COLS)
+    # copd_model_v2 is CalibratedClassifierCV(ImbPipeline(LR)); average coefs across folds
+    try:
+        coefs = np.mean([
+            c.estimator.named_steps["classifier"].coef_[0]
+            for c in model.calibrated_classifiers_
+        ], axis=0)
+        fi_vals = abs(coefs)
+    except Exception:
+        fi_vals = np.ones(len(feature_names))
+    fi_series = pd.Series(fi_vals, index=feature_names)
     fi_series.index = [FEATURE_LABELS.get(f, f) for f in fi_series.index]
     fi_df = fi_series.sort_values().tail(15)
 
@@ -334,8 +338,8 @@ with param_col:
         ("Algorithm",       "Logistic Regression (L2, lbfgs)"),
         ("C (regularisation)", "0.1"),
         ("max_iter",        "1000"),
-        ("Training data",   "8000 synthetic + 101 Kaggle"),
-        ("Augmentation",    "101 real COPD patients (Kaggle)"),
+        ("Training data",   "7,958 synthetic patients (80% split)"),
+        ("Augmentation",    "None (Iteration 2)"),
         ("Imbalance handling", "SMOTE (k=5)"),
         ("Threshold",       f"{THRESHOLD:.3f}"),
         ("Optimised for",   "Recall ≥ 90%"),
@@ -372,12 +376,12 @@ data_col, label_col = st.columns(2, gap="medium")
 with data_col:
     st.markdown('<div class="card"><div class="card-title">📂 Training Dataset</div>', unsafe_allow_html=True)
 
-    # 3-slice donut: synthetic COPD-, synthetic COPD+, Kaggle COPD+
+    # 2-slice donut: training COPD- and COPD+ (Iteration 2 — no external augmentation)
     donut = go.Figure(go.Pie(
-        labels=["Synthetic — No COPD", "Synthetic — COPD", "Kaggle — COPD (real)"],
-        values=[5131, 2869, 101],
+        labels=["Train — No COPD", "Train — COPD+"],
+        values=[1878, 6080],
         hole=0.58,
-        marker_colors=["#dbeafe", "#1d4ed8", "#7c3aed"],
+        marker_colors=["#dbeafe", "#1d4ed8"],
         textinfo="percent",
         textfont={"size": 10},
         hovertemplate="%{label}<br>%{value} patients (%{percent})<extra></extra>",
@@ -387,22 +391,22 @@ with data_col:
         paper_bgcolor="white",
         legend=dict(orientation="h", y=-0.15, font={"size": 9, "color": "#64748b"}),
         font={"color": "#475569"},
-        annotations=[{"text": "8,101<br>train", "x": 0.5, "y": 0.5,
+        annotations=[{"text": "7,958<br>train", "x": 0.5, "y": 0.5,
                       "font": {"size": 13, "color": "#0f172a"}, "showarrow": False}],
     )
     st.plotly_chart(donut, use_container_width=True)
 
     data_facts = [
-        ("Synthetic patients (total)", "10,000"),
-        ("  → Train split", "8,000  (80%)"),
-        ("  → Test split", "2,000  (20%, held out)"),
-        ("Kaggle augmentation (train only)", "101 real patients"),
-        ("Total training set", "8,101 patients"),
-        ("COPD+ in training", "2,970  (36.7%)"),
-        ("After SMOTE", "5,131 vs 5,131  (balanced)"),
-        ("Test set (synthetic only)", "717 COPD+  / 1,283 COPD−"),
+        ("Patients with spirometry (total)", "9,948"),
+        ("  → Train split", "7,958  (80%)"),
+        ("  → Test split", "1,990  (20%, held out)"),
+        ("COPD+ in training", "~6,080  (76.4%)"),
+        ("COPD− in training", "~1,878  (23.6%)"),
+        ("After SMOTE (per fold)", "6,080 vs 6,080  (balanced)"),
+        ("Test set", "~1,520 COPD+  / ~470 COPD−"),
+        ("External augmentation", "None (Iteration 2)"),
         ("Language", "Spanish (clinical notes)"),
-        ("Features engineered", str(len(FEATURE_COLS))),
+        ("Features engineered", "30 (FEATURES_MAIN)"),
     ]
     rows3 = "".join(
         f'<div class="param-row"><span class="param-key">{k}</span><span class="param-val">{v}</span></div>'
@@ -410,30 +414,16 @@ with data_col:
     )
     st.markdown(rows3, unsafe_allow_html=True)
 
-    # ── Kaggle dataset details ────────────────────────────────────────
     st.markdown("""
     <div style="border-top:1px solid #f1f5f9; margin:14px 0 10px;"></div>
-    <div style="font-size:0.78rem; font-weight:700; color:#7c3aed; text-transform:uppercase;
-                letter-spacing:0.05em; margin-bottom:8px;">🟣 Kaggle Dataset Details</div>
-    <div style="font-size:0.82rem; line-height:1.75; color:#475569;">
-      <strong>Source:</strong> Kaggle — COPD Patient Dataset (public)<br>
-      <strong>Patients:</strong> 101 · All confirmed COPD (GOLD 1–4)<br>
-      <strong>No healthy controls</strong> — positive class only<br>
-      <strong>Features mapped:</strong> Age, pack-history, FEV1, FEV1% predicted, FVC,
-        CAT score, sex, smoking status, diabetes, hypertension, IHD (6 of 12 columns
-        overlapped with our schema; remainder imputed with training-set median)<br>
-      <strong>GOLD severity split:</strong>
-      <span style="color:#16a34a;">MILD 23%</span> ·
-      <span style="color:#b45309;">MODERATE 43%</span> ·
-      <span style="color:#dc2626;">SEVERE 27%</span> ·
-      <span style="color:#9333ea;">VERY SEVERE 8%</span>
-    </div>
-    <div style="background:#f5f3ff; border:1px solid #e9d5ff; border-radius:8px;
-                padding:10px 12px; margin-top:10px; font-size:0.81rem; color:#4c1d95;">
-      <strong>How it was used:</strong> Added to the <em>training set only</em> as positive-class
-      augmentation. The test set (2,000 patients) remains purely synthetic and uncontaminated,
-      so evaluation metrics are not inflated. The 101 real patients help the model better
-      calibrate the positive class, improving AUC from 0.574 → 0.621 (+8.2%).
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                padding:10px 12px; margin-top:10px; font-size:0.81rem; color:#166534;">
+      <strong>Iteration 2 — no external augmentation.</strong> All 9,948 patients come from the
+      synthetic EHR dataset. Patients without clean spirometry records were excluded (52 removed).
+      The high COPD+ prevalence (76.4%) reflects Strategy B labelling: any patient with at least
+      one obstructive spirometry test (min FEV₁/FVC &lt; 0.70) is labelled positive.
+      SMOTE rebalances to 1:1 <em>inside each CV fold</em>; Platt scaling recalibrates
+      predicted probabilities back to the 76.4% training distribution.
     </div>
     </div>
     """, unsafe_allow_html=True)
@@ -459,12 +449,28 @@ with label_col:
       </div>
     </div>
 
-    <p style="margin:0 0 8px;"><strong>Reproducibility requirement:</strong></p>
+    <p style="margin:0 0 8px;"><strong>Label rule (GOLD 2024 — Iteration 2):</strong></p>
     <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
                 padding:12px 14px; margin-bottom:14px; font-size:0.83rem; color:#166534;">
-      COPD = <strong>ALL</strong> recorded spirometry tests for a patient show FEV₁/FVC &lt; 0.70.
-      A single low reading is insufficient — consistent obstruction is required,
-      mirroring the clinical requirement for reproducible post-bronchodilator obstruction.
+      COPD = <strong>minimum</strong> FEV₁/FVC ratio across all clean spirometry tests &lt; 0.70.
+      A patient with at least one confirmed obstructive measurement is labelled positive,
+      consistent with the GOLD 2024 definition of persistent airflow limitation.
+    </div>
+
+    <p style="margin:0 0 8px;"><strong>Training prevalence & class balancing:</strong></p>
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+                padding:12px 14px; margin-bottom:14px; font-size:0.83rem; color:#1e40af;">
+      Applying the minimum-ratio rule to a cohort where all patients have at least one
+      spirometry record yields a high COPD+ prevalence (<strong>76.4%</strong> of training patients).
+      This reflects the selection bias of the cohort — patients who undergo spirometry are
+      already suspected of having airway disease — not the prevalence in a general unscreened
+      population.<br><br>
+      During training, <strong>SMOTE</strong> resamples each fold to a 50/50 class ratio so the
+      model learns discriminative signal rather than predicting the majority class.
+      <strong>Platt scaling</strong> (sigmoid calibration, 5-fold CV) then recalibrates the output
+      probabilities back to the observed training distribution. The reported threshold (0.667)
+      and predicted probabilities reflect the 76.4% training prevalence and should be
+      interpreted accordingly when applied to populations with a different base rate.
     </div>
 
     <p style="margin:0 0 6px;"><strong>Why not use target.csv?</strong></p>
@@ -487,17 +493,19 @@ with lim_col:
     st.markdown('<div class="card"><div class="card-title">⚠️ Limitations & Known Issues</div>', unsafe_allow_html=True)
     limitations = [
         ("🧪", "Synthetic dataset",
-         "The model was trained on synthetically generated data augmented with 101 real COPD patients from a Kaggle dataset. Clinical features were not strongly correlated with spirometry outcomes in the synthetic generation process, resulting in a lower ROC-AUC (0.621) than expected for real-world data. Performance on real patient populations is unknown."),
+         "The model was trained entirely on synthetically generated EHR data. Clinical features are not strongly correlated with spirometry outcomes in the synthetic generation process, resulting in a lower ROC-AUC (0.586) than expected for real-world data. Performance on real patient populations is unknown."),
         ("📉", "Moderate ROC-AUC",
-         "AUC of 0.621 reflects the synthetic data limitation — not the clinical validity of the features used. Real-world COPD screening studies typically achieve AUC 0.75–0.90. Augmentation with real Kaggle data improved AUC from 0.574 to 0.621."),
+         "AUC of 0.586 reflects the synthetic data limitation — not the clinical validity of the features used. Real-world COPD screening studies typically achieve AUC 0.75–0.90. No spirometry features are used (by design), as they would constitute label leakage."),
         ("⚖️", "Low specificity",
-         f"At the chosen threshold ({THRESHOLD:.3f}), specificity is ~15%, meaning many patients without COPD are flagged. This is intentional for a screening tool but increases spirometry workload."),
+         f"At the chosen threshold ({THRESHOLD:.3f}), specificity is ~17.5%, meaning many patients without COPD are flagged. This is intentional for a screening tool but increases spirometry workload."),
         ("🌍", "Population generalisability",
          "Trained on a single synthetic cohort. Performance may differ across ethnicities, regions, or healthcare systems not represented in training data."),
         ("📅", "Static snapshot",
          "The model uses a single point-in-time feature snapshot. It does not model disease progression or longitudinal trends beyond the engineered features."),
         ("🔬", "No post-bronchodilator data",
          "True GOLD standard requires post-bronchodilator FEV₁/FVC. This dataset does not distinguish pre/post bronchodilator measurements."),
+        ("📊", "Training prevalence mismatch",
+         "The training cohort has a 76.4% COPD+ prevalence because all patients in the dataset underwent spirometry — a pre-selected, high-suspicion group. SMOTE rebalances training folds to 50/50; Platt scaling recalibrates output probabilities to the observed training distribution. Both the optimised threshold and predicted probabilities reflect this prevalence. In a real unscreened primary care population (estimated COPD prevalence 8–15%), predicted probabilities would need recalibration against local base-rate data before clinical use."),
     ]
     for icon, title, desc in limitations:
         st.markdown(f"""

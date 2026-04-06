@@ -20,26 +20,21 @@ st.set_page_config(
 # ── Model ────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    base = os.path.dirname(__file__)
-    return (
-        joblib.load(os.path.join(base, "models", "xgb_model.pkl")),
-        joblib.load(os.path.join(base, "models", "preprocessor.pkl")),
-        joblib.load(os.path.join(base, "models", "threshold.pkl")),
-    )
+    base     = os.path.dirname(__file__)
+    artifact = joblib.load(os.path.join(base, "models", "copd_model_v2.pkl"))
+    return artifact["model"], artifact["threshold"], artifact["feature_names"]
 
-model, preprocessor, threshold = load_model()
+model, threshold, feature_names = load_model()
 
 def get_risk(patient):
     # Confirmed COPD patients bypass the screening model entirely
     if patient.get("confirmed_copd"):
         return None, "Confirmed COPD", "#7c3aed", "#f3e8ff", "#e9d5ff"
-    row      = build_single_patient_row(patient["model_inputs"])
-    row_prep = preprocessor.transform(row)
-    proba    = float(model.predict_proba(row_prep)[0, 1])
-    if proba < 0.25:   return proba, "Low",       "#16a34a", "#dcfce7", "#bbf7d0"
-    elif proba < 0.45: return proba, "Moderate",  "#b45309", "#fef9c3", "#fde68a"
-    elif proba < 0.65: return proba, "High",       "#dc2626", "#fee2e2", "#fecaca"
-    else:              return proba, "Very High",  "#9333ea", "#f3e8ff", "#e9d5ff"
+    row   = build_single_patient_row(patient["model_inputs"])
+    proba = float(model.predict_proba(row[feature_names].values)[0, 1])
+    if proba >= threshold: return proba, "Refer",    "#dc2626", "#fee2e2", "#fecaca"
+    elif proba >= 0.35:    return proba, "Monitor",  "#b45309", "#fef9c3", "#fde68a"
+    else:                  return proba, "Low Risk", "#16a34a", "#dcfce7", "#bbf7d0"
 
 if "patient_risks" not in st.session_state:
     st.session_state["patient_risks"] = {p["id"]: get_risk(p) for p in FAKE_PATIENTS}
@@ -123,10 +118,10 @@ st.markdown("""
     transition: box-shadow 0.15s, border-color 0.15s;
   }
   .pt-row:hover { box-shadow: 0 4px 14px rgba(30,58,92,0.1); border-color: #93c5fd; }
-  .pt-row-high     { border-left-color: #dc2626 !important; }
-  .pt-row-veryhigh { border-left-color: #9333ea !important; }
-  .pt-row-moderate { border-left-color: #b45309 !important; }
-  .pt-row-low      { border-left-color: #16a34a !important; }
+  .pt-row-refer   { border-left-color: #dc2626 !important; }
+  .pt-row-monitor { border-left-color: #b45309 !important; }
+  .pt-row-low     { border-left-color: #16a34a !important; }
+  .pt-row-copd    { border-left-color: #7c3aed !important; }
 
   .avatar {
     width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
@@ -142,10 +137,10 @@ st.markdown("""
     display: inline-flex; align-items: center; gap: 5px;
     border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; font-weight: 700;
   }
-  .badge-low      { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-  .badge-moderate { background: #fef9c3; color: #a16207; border: 1px solid #fde68a; }
-  .badge-high     { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-  .badge-veryhigh { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+  .badge-low     { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge-monitor { background: #fef9c3; color: #a16207; border: 1px solid #fde68a; }
+  .badge-refer   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+  .badge-copd    { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
 
   .tag-pill {
     display: inline-block; background: #f0f9ff; color: #0369a1;
@@ -243,7 +238,7 @@ st.markdown("""
 
 # ── Alert banner ──────────────────────────────────────────────────────
 high_risk = [p for p in FAKE_PATIENTS
-             if st.session_state["patient_risks"][p["id"]][1] in ("High", "Very High")
+             if st.session_state["patient_risks"][p["id"]][1] == "Refer"
              and not p.get("confirmed_copd")]
 if high_risk:
     names = ", ".join(p["name"] for p in high_risk)
@@ -261,11 +256,11 @@ sc1, sc2, sc3, sc4, sc5 = st.columns(5)
 for col, (val, lbl, color) in zip(
     [sc1, sc2, sc3, sc4, sc5],
     [
-        ("6", "Today's Patients", "#1e3a5c"),
-        (str(risks.count("Low")), "Low Risk", "#16a34a"),
-        (str(risks.count("Moderate")), "Moderate Risk", "#b45309"),
-        (str(risks.count("High") + risks.count("Very High")), "High / Very High", "#dc2626"),
-        ("2", "Pending Spirometry", "#f97316"),
+        (str(len(FAKE_PATIENTS)), "Today's Patients", "#1e3a5c"),
+        (str(risks.count("Low Risk")), "Low Risk", "#16a34a"),
+        (str(risks.count("Monitor")), "Monitor", "#b45309"),
+        (str(risks.count("Refer")), "Refer for Spirometry", "#dc2626"),
+        (str(risks.count("Confirmed COPD")), "Confirmed COPD", "#7c3aed"),
     ]
 ):
     with col:
@@ -282,7 +277,7 @@ st.markdown('<div class="section-lbl">Today\'s Patient List — Monday, 23 March
             unsafe_allow_html=True)
 
 fc1, fc2, _ = st.columns([1, 1, 3])
-filter_risk = fc1.selectbox("Risk", ["All", "Very High", "High", "Moderate", "Low", "Confirmed COPD"],
+filter_risk = fc1.selectbox("Risk", ["All", "Refer", "Monitor", "Low Risk", "Confirmed COPD"],
                              label_visibility="collapsed")
 filter_gp   = fc2.selectbox("GP",   ["All GPs", "Dr. A. Patel", "Dr. S. Thompson"],
                              label_visibility="collapsed")
@@ -303,11 +298,10 @@ for p in FAKE_PATIENTS:
 
     confirmed = p.get("confirmed_copd", False)
     badge_class = {
-        "Low": "badge-low", "Moderate": "badge-moderate",
-        "High": "badge-high", "Very High": "badge-veryhigh",
-        "Confirmed COPD": "badge-veryhigh",
+        "Low Risk": "badge-low", "Monitor": "badge-monitor",
+        "Refer": "badge-refer", "Confirmed COPD": "badge-copd",
     }[risk_level]
-    risk_icon = {"Low":"🟢","Moderate":"🟡","High":"🔴","Very High":"🚨","Confirmed COPD":"✅"}[risk_level]
+    risk_icon = {"Low Risk": "🟢", "Monitor": "🟡", "Refer": "🔴", "Confirmed COPD": "✅"}[risk_level]
     prob_line = (
         '<div style="color:#7c3aed; font-size:0.72rem; margin-top:3px; font-weight:600;">COPD diagnosed</div>'
         if confirmed else
@@ -316,9 +310,8 @@ for p in FAKE_PATIENTS:
 
     row_col, btn_col = st.columns([7, 1])
     accent_class = {
-        "Low": "pt-row-low", "Moderate": "pt-row-moderate",
-        "High": "pt-row-high", "Very High": "pt-row-veryhigh",
-        "Confirmed COPD": "pt-row-veryhigh",
+        "Low Risk": "pt-row-low", "Monitor": "pt-row-monitor",
+        "Refer": "pt-row-refer", "Confirmed COPD": "pt-row-copd",
     }[risk_level]
     with row_col:
         st.markdown(f"""

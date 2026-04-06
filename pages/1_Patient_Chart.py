@@ -24,13 +24,9 @@ st.set_page_config(
 # ── Model ────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    base = os.path.dirname(os.path.dirname(__file__))
-    return (
-        joblib.load(os.path.join(base, "models", "xgb_model.pkl")),
-        joblib.load(os.path.join(base, "models", "preprocessor.pkl")),
-        joblib.load(os.path.join(base, "models", "threshold.pkl")),
-        joblib.load(os.path.join(base, "models", "feature_cols.pkl")),
-    )
+    base     = os.path.dirname(os.path.dirname(__file__))
+    artifact = joblib.load(os.path.join(base, "models", "copd_model_v2.pkl"))
+    return artifact["model"], artifact["threshold"], artifact["feature_names"]
 
 @st.cache_resource
 def load_severity_model():
@@ -44,7 +40,7 @@ def load_severity_model():
         joblib.load(os.path.join(base, "models", "severity_feature_cols.pkl")),
     )
 
-model, preprocessor, threshold, feat_cols = load_model()
+model, threshold, feature_names = load_model()
 sev_model, sev_preprocessor, sev_feat_cols = load_severity_model()
 
 # ── CSS (light doctor theme) ─────────────────────────────────────────
@@ -214,9 +210,8 @@ if "selected_patient_id" not in st.session_state:
 patient  = PATIENT_BY_ID[st.session_state["selected_patient_id"]]
 confirmed_copd = patient.get("confirmed_copd", False)
 
-row      = build_single_patient_row(patient["model_inputs"])
-row_prep = preprocessor.transform(row)
-base_proba = float(model.predict_proba(row_prep)[0, 1])
+row        = build_single_patient_row(patient["model_inputs"])
+base_proba = float(model.predict_proba(row[feature_names].values)[0, 1])
 
 # Post-questionnaire risk update (if patient has completed the CAT form)
 pid = st.session_state["selected_patient_id"]
@@ -245,7 +240,7 @@ predicted = int(proba >= threshold)
 
 # GOLD severity estimate for high-risk patients
 gold_severity = None
-if sev_model is not None and proba >= 0.45:
+if sev_model is not None and proba >= threshold:
     inp = patient["model_inputs"]
     sev_row = {
         "AGE":          inp.get("edad", 60),
@@ -270,18 +265,15 @@ if sev_model is not None and proba >= 0.45:
 if confirmed_copd:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
         "Confirmed COPD", "#7c3aed", "#faf5ff", "#e9d5ff", "#faf5ff", "#e9d5ff", "#4c1d95"
-elif proba < 0.25:
+elif proba >= threshold:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Low", "#16a34a", "#f0fdf4", "#bbf7d0", "#f0fdf4", "#bbf7d0", "#14532d"
-elif proba < 0.45:
+        "Refer", "#dc2626", "#fff1f2", "#fecaca", "#fff1f2", "#fecaca", "#7f1d1d"
+elif proba >= 0.35:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Moderate", "#b45309", "#fefce8", "#fde68a", "#fefce8", "#fde68a", "#713f12"
-elif proba < 0.65:
-    rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "High", "#dc2626", "#fff1f2", "#fecaca", "#fff1f2", "#fecaca", "#7f1d1d"
+        "Monitor", "#b45309", "#fefce8", "#fde68a", "#fefce8", "#fde68a", "#713f12"
 else:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Very High", "#9333ea", "#faf5ff", "#e9d5ff", "#faf5ff", "#e9d5ff", "#4c1d95"
+        "Low Risk", "#16a34a", "#f0fdf4", "#bbf7d0", "#f0fdf4", "#bbf7d0", "#14532d"
 
 # ── Alert strip ────────────────────────────────────────────────────────
 if confirmed_copd:
@@ -294,8 +286,8 @@ if confirmed_copd:
 elif predicted:
     st.markdown(f"""
     <div class="alert-strip">
-      ⚠️ <strong>COPD AI Alert:</strong> {patient['name']} is flagged as
-      <strong>{rl} Risk</strong> ({proba*100:.0f}%).
+      ⚠️ <strong>COPD AI Alert:</strong> {patient['name']} is flagged for spirometry referral —
+      <strong>{rl}</strong> ({proba*100:.0f}% probability).
       Spirometry referral is recommended.
     </div>
     """, unsafe_allow_html=True)
