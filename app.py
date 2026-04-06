@@ -7,7 +7,7 @@ import joblib
 import streamlit as st
 
 sys.path.insert(0, os.path.dirname(__file__))
-from utils.fake_patients import FAKE_PATIENTS, PATIENT_BY_ID
+from utils.fake_patients import FAKE_PATIENTS
 from utils.preprocess import build_single_patient_row
 
 st.set_page_config(

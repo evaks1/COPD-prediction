@@ -7,98 +7,69 @@ they are healthcare access proxies, not clinical COPD risk factors.
 """
 
 import pandas as pd
-import numpy as np
 import re
 
 DATASET_PATH  = "/Users/elsaleksandra/Downloads/dataset_epoc_advanced1"
 KAGGLE_PATH   = "/Users/elsaleksandra/GSKIE/dataset.csv"
 
-# ── Feature column order (must be consistent between train and inference) ─────
+# ── Feature column order — matches copd_model_v2.pkl feature_names exactly ────
 FEATURE_COLS = [
-    # Core demographics (clinical only — no socioeconomic proxies)
-    "edad", "sexo_num", "imc",
+    # Demographics
+    "edad", "sexo", "imc",
 
-    # Smoking (primary clinical risk factors)
-    "fumador_actual", "exfumador", "ever_smoked",
-    "paquetes_ano", "age_x_packyears", "high_risk_smoker",
+    # Smoking
+    "fumador_actual", "exfumador", "paquetes_ano",
 
     # Physical activity
-    "actividad_num",
+    "actividad_fisica",
 
     # Lab results
-    "pcr_mg_l", "crp_elevated",
-    "vitamina_d_ng_ml", "vitamin_d_deficient",
-    "colesterol_total_mg_dl", "ferritina_ng_ml", "tsh_ui_ml",
+    "pcr_mg_l", "vitamina_d_ng_ml", "colesterol_total_mg_dl",
+    "ferritina_ng_ml", "tsh_ui_ml",
 
-    # Exacerbations
-    "exacerbaciones_ultimo_anio",
-    "n_exacerbaciones_moderadas",
-    "n_exacerbaciones_graves",
-    "exacerbation_severity_score",
-
-    # Medications (respiratory burden)
-    "n_medications", "respiratory_med_count",
-    "has_copd_medication",
-    "med_lama", "med_laba", "med_saba",
-    "med_laba_lama", "med_laba_lama_ics",
-    "med_cs_systemic", "med_resp_antibiotic",
+    # Engineered
+    "ever_smoked", "crp_elevated", "vitamin_d_deficient", "age_x_packyears",
 
     # Comorbidities
-    "n_diagnoses", "n_unique_diagnoses", "comorbidity_index",
-    "has_copd_diagnosis", "has_asthma",
-    "has_hypertension", "has_diabetes",
-    "has_heart_disease", "has_depression",
+    "has_asthma", "has_hypertension", "has_diabetes", "has_ihd", "has_depression",
+    "n_unique_diag",
 
     # NLP from clinical notes
-    "note_has_dyspnea", "note_has_exacerbations",
-    "note_no_symptoms", "note_respiratory_keyword_score",
+    "kw_dyspnea", "kw_cough", "kw_sputum", "kw_exacerbation",
+    "kw_breathless", "kw_no_symptoms", "kw_wheezing", "keyword_score",
 ]
 
 FEATURE_LABELS = {
     "edad": "Age",
-    "sexo_num": "Sex (Male)",
+    "sexo": "Sex (Male)",
     "imc": "BMI",
     "fumador_actual": "Current Smoker",
     "exfumador": "Ex-smoker",
-    "ever_smoked": "Ever Smoked",
     "paquetes_ano": "Pack-Years",
-    "age_x_packyears": "Age × Pack-Years",
-    "high_risk_smoker": "High-Risk Smoker (age>55, >10 pack-years)",
-    "actividad_num": "Physical Activity Level",
+    "actividad_fisica": "Physical Activity Level",
     "pcr_mg_l": "C-Reactive Protein (mg/L)",
-    "crp_elevated": "Elevated CRP (>10 mg/L)",
     "vitamina_d_ng_ml": "Vitamin D (ng/mL)",
-    "vitamin_d_deficient": "Vitamin D Deficiency (<20 ng/mL)",
     "colesterol_total_mg_dl": "Total Cholesterol (mg/dL)",
     "ferritina_ng_ml": "Ferritin (ng/mL)",
     "tsh_ui_ml": "TSH (mIU/mL)",
-    "exacerbaciones_ultimo_anio": "Exacerbations Last Year",
-    "n_exacerbaciones_moderadas": "Moderate Exacerbations",
-    "n_exacerbaciones_graves": "Severe Exacerbations",
-    "exacerbation_severity_score": "Exacerbation Severity Score",
-    "n_medications": "Total Medications",
-    "respiratory_med_count": "Respiratory Med Classes",
-    "has_copd_medication": "On COPD Medication",
-    "med_lama": "LAMA (e.g. Tiotropium)",
-    "med_laba": "LABA (e.g. Formoterol)",
-    "med_saba": "SABA (e.g. Salbutamol)",
-    "med_laba_lama": "LABA+LAMA Combo",
-    "med_laba_lama_ics": "Triple Therapy (LABA+LAMA+ICS)",
-    "med_cs_systemic": "Systemic Corticosteroids",
-    "med_resp_antibiotic": "Respiratory Antibiotics",
-    "n_diagnoses": "Total Diagnoses",
-    "n_unique_diagnoses": "Unique Diagnoses",
-    "comorbidity_index": "Comorbidity Burden Index",
-    "has_copd_diagnosis": "Prior COPD Diagnosis (J44)",
+    "ever_smoked": "Ever Smoked",
+    "crp_elevated": "Elevated CRP (>10 mg/L)",
+    "vitamin_d_deficient": "Vitamin D Deficiency (<20 ng/mL)",
+    "age_x_packyears": "Age × Pack-Years",
     "has_asthma": "Asthma (J45)",
     "has_hypertension": "Hypertension (I10)",
     "has_diabetes": "Type 2 Diabetes (E11)",
-    "has_heart_disease": "Ischaemic Heart Disease (I25)",
+    "has_ihd": "Ischaemic Heart Disease (I25)",
     "has_depression": "Depression (F32)",
-    "note_has_dyspnea": "Clinical Note: Dyspnoea Mentioned",
-    "note_has_exacerbations": "Clinical Note: Exacerbations Mentioned",
-    "note_no_symptoms": "Clinical Note: No Respiratory Symptoms",
-    "note_respiratory_keyword_score": "Clinical Note: Respiratory Keyword Score",
+    "n_unique_diag": "Unique Diagnoses",
+    "kw_dyspnea": "Clinical Note: Dyspnoea",
+    "kw_cough": "Clinical Note: Cough",
+    "kw_sputum": "Clinical Note: Sputum",
+    "kw_exacerbation": "Clinical Note: Exacerbation",
+    "kw_breathless": "Clinical Note: Breathlessness",
+    "kw_no_symptoms": "Clinical Note: No Symptoms",
+    "kw_wheezing": "Clinical Note: Wheezing",
+    "keyword_score": "Clinical Note: Keyword Score",
 }
 
 # ── NLP helpers ───────────────────────────────────────────────────────────────
@@ -111,14 +82,19 @@ _RESP_KEYWORDS = [
 _KEYWORD_RE = re.compile("|".join(_RESP_KEYWORDS), re.IGNORECASE)
 
 
+
 def _extract_note_features(note: str) -> dict:
     note = str(note).lower()
     kw_count = len(_KEYWORD_RE.findall(note))
     return {
-        "note_has_dyspnea":              int("disnea" in note),
-        "note_has_exacerbations":        int("exacerbaci" in note),
-        "note_no_symptoms":              int("sin s" in note and "ntomas" in note),
-        "note_respiratory_keyword_score": min(kw_count, 10),
+        "kw_dyspnea":    int("disnea" in note),
+        "kw_cough":      int("tos" in note),
+        "kw_sputum":     int("expectoraci" in note or "esputo" in note),
+        "kw_exacerbation": int("exacerbaci" in note),
+        "kw_breathless": int("ahogo" in note or "jadeo" in note or "falta de aire" in note),
+        "kw_no_symptoms": int("sin s" in note and "ntomas" in note),
+        "kw_wheezing":   int("sibilancias" in note or "pitos" in note),
+        "keyword_score": min(kw_count, 10),
     }
 
 
@@ -324,36 +300,32 @@ def build_feature_matrix() -> tuple:
 def build_single_patient_row(inputs: dict) -> pd.DataFrame:
     """
     Build a single-row feature dataframe for real-time inference.
-    Handles engineered feature derivation from raw inputs.
+    Column names match copd_model_v2.pkl feature_names exactly.
     """
-    d = dict(inputs)  # copy
+    d = dict(inputs)
 
-    # Derive engineered features from raw inputs
-    edad         = d.get("edad", 50)
-    pack_years   = d.get("paquetes_ano", 0) or 0
-    fumador      = d.get("fumador_actual", 0) or 0
-    exfumador    = d.get("exfumador", 0) or 0
-    exac_year    = d.get("exacerbaciones_ultimo_anio", 0) or 0
-    exac_mod     = d.get("n_exacerbaciones_moderadas", 0) or 0
-    exac_sev     = d.get("n_exacerbaciones_graves", 0) or 0
-    pcr          = d.get("pcr_mg_l") or 0
-    vitd         = d.get("vitamina_d_ng_ml") or 0
+    edad      = d.get("edad", 50)
+    pack_years = d.get("paquetes_ano", 0) or 0
+    fumador   = d.get("fumador_actual", 0) or 0
+    exfumador = d.get("exfumador", 0) or 0
+    pcr       = d.get("pcr_mg_l") or 0
+    vitd      = d.get("vitamina_d_ng_ml") or 0
 
-    d["age_x_packyears"]           = edad * pack_years
-    d["ever_smoked"]               = int(fumador or exfumador)
-    d["high_risk_smoker"]          = int(edad > 55 and d["ever_smoked"] and pack_years > 10)
-    d["exacerbation_severity_score"] = exac_year + 2 * exac_mod + 4 * exac_sev
-    d["crp_elevated"]              = int(pcr > 10)
-    d["vitamin_d_deficient"]       = int(0 < vitd < 20)
+    # Engineered features
+    d["ever_smoked"]      = int(fumador or exfumador)
+    d["crp_elevated"]     = int(pcr > 10)
+    d["vitamin_d_deficient"] = int(0 < vitd < 20)
+    d["age_x_packyears"]  = edad * pack_years
 
-    comorbidity_cols = ["has_copd_diagnosis", "has_asthma", "has_hypertension",
-                        "has_diabetes", "has_heart_disease", "has_depression"]
-    d["comorbidity_index"] = sum(d.get(c, 0) or 0 for c in comorbidity_cols)
+    # Input key → model key remapping
+    d["sexo"]           = d.get("sexo_num", 0)
+    d["actividad_fisica"] = d.get("actividad_num", 1)
+    d["has_ihd"]        = d.get("has_heart_disease", 0)
+    d["n_unique_diag"]  = d.get("n_unique_diagnoses", 0)
 
-    # NLP from free-text note (optional)
+    # NLP from free-text note
     note = d.pop("clinical_note", "") or ""
-    note_feats = _extract_note_features(note)
-    d.update(note_feats)
+    d.update(_extract_note_features(note))
 
     row = {col: d.get(col, 0) for col in FEATURE_COLS}
     return pd.DataFrame([row])
