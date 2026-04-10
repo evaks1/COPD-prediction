@@ -460,7 +460,7 @@ with ai_col:
             <div class="prob-bar-fill" style="background:{rc}; width:{proba*100:.1f}%;"></div>
           </div>
           <div style="font-size:0.72rem; color:#94a3b8;">
-            Threshold {threshold:.2f} · LR+Kaggle · Sensitivity ≥91% · GOLD Standard
+            Threshold {threshold:.2f} · LR · Sensitivity ≥91% · GOLD Standard
           </div>
         </div>
         """, unsafe_allow_html=True)
