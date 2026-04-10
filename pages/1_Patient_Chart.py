@@ -518,10 +518,9 @@ with ai_col:
 
     # Recommendation
     rec_texts = {
-        "Low":            "✅ No immediate action needed. Reassess in 12 months or if symptoms develop.",
-        "Moderate":       "⚠️ Consider spirometry at next visit. Direct patient to complete the symptom questionnaire.",
-        "High":           "🔴 Spirometry referral recommended. Discuss with patient today and send questionnaire link.",
-        "Very High":      "🚨 Urgent spirometry referral. Consider early pulmonology review.",
+        "Low Risk":       "✅ No immediate action needed. Reassess in 12 months or if symptoms develop.",
+        "Monitor":        "⚠️ Consider spirometry at next visit. Direct patient to complete the symptom questionnaire.",
+        "Refer":          "🔴 Spirometry referral recommended. Discuss with patient today and send questionnaire link.",
         "Confirmed COPD": "📋 Continue GOLD-guided management. Review inhaler technique, exacerbation action plan, and pulmonary rehabilitation eligibility.",
     }
     st.markdown(f"""
@@ -531,7 +530,7 @@ with ai_col:
     """, unsafe_allow_html=True)
 
     # SHAP
-    with st.expander("🔍 Key Contributing Risk Factors", expanded=(rl in ("High","Very High"))):
+    with st.expander("🔍 Key Contributing Risk Factors", expanded=(rl in ("Refer", "Confirmed COPD"))):
         try:
             import shap
             if hasattr(model, "coef_"):
