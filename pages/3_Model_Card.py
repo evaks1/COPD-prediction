@@ -281,7 +281,7 @@ with fi_col:
     # copd_model_v2 is CalibratedClassifierCV(ImbPipeline(LR)); average coefs across folds
     try:
         coefs = np.mean([
-            c.estimator.named_steps["classifier"].coef_[0]
+            c.estimator.named_steps["clf"].coef_[0]
             for c in model.calibrated_classifiers_
         ], axis=0)
         fi_vals = abs(coefs)

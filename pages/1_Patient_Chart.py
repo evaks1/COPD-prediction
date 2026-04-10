@@ -532,18 +532,17 @@ with ai_col:
     # SHAP
     with st.expander("🔍 Key Contributing Risk Factors", expanded=(rl in ("Refer", "Confirmed COPD"))):
         try:
-            import shap
-            if hasattr(model, "coef_"):
-                # Logistic Regression — use coefficient × feature value as attribution
-                coefs = model.coef_[0]
-                sv = coefs * row_prep[0]
-            else:
-                explainer = shap.TreeExplainer(model)
-                sv = explainer.shap_values(row_prep)[0]
+            # CalibratedClassifierCV wrapping ImbPipeline(LR) — average coefs across folds
+            coefs = np.mean([
+                c.estimator.named_steps["clf"].coef_[0]
+                for c in model.calibrated_classifiers_
+            ], axis=0)
+            row_vals = row[feature_names].values[0]
+            sv = coefs * row_vals
             shap_df = pd.DataFrame({
-                "feature": feat_cols,
-                "shap": sv,
-                "label": [FEATURE_LABELS.get(f, f) for f in feat_cols],
+                "feature": feature_names,
+                "shap":    sv,
+                "label":   [FEATURE_LABELS.get(f, f) for f in feature_names],
             }).sort_values("shap", key=abs, ascending=False).head(10)
 
             fig_s = go.Figure()
@@ -551,25 +550,26 @@ with ai_col:
                 y=shap_df["label"][::-1],
                 x=shap_df["shap"][::-1],
                 orientation="h",
-                marker_color=["#dc2626" if v>0 else "#16a34a" for v in shap_df["shap"][::-1]],
+                marker_color=["#dc2626" if v > 0 else "#16a34a" for v in shap_df["shap"][::-1]],
                 hovertemplate="%{y}: %{x:.3f}<extra></extra>",
             ))
             fig_s.add_vline(x=0, line_width=1, line_color="#e2e8f0")
             fig_s.update_layout(
-                height=300, margin=dict(l=8,r=8,t=8,b=24),
+                height=300, margin=dict(l=8, r=8, t=8, b=24),
                 paper_bgcolor="#ffffff", plot_bgcolor="#f8fafc",
-                font={"color":"#64748b","size":10},
-                xaxis={"gridcolor":"#f1f5f9", "title":""},
-                yaxis={"title":""},
+                font={"color": "#64748b", "size": 10},
+                xaxis={"gridcolor": "#f1f5f9", "title": ""},
+                yaxis={"title": ""},
             )
             st.plotly_chart(fig_s, use_container_width=True)
             st.caption("🔴 Increases risk &nbsp;&nbsp; 🟢 Decreases risk")
         except Exception:
-            if hasattr(model, "coef_"):
-                fi = pd.Series(abs(model.coef_[0]), index=feat_cols)
-            else:
-                fi = pd.Series(model.feature_importances_, index=feat_cols)
-            fi.index = [FEATURE_LABELS.get(f,f) for f in fi.index]
+            coefs = np.mean([
+                c.estimator.named_steps["clf"].coef_[0]
+                for c in model.calibrated_classifiers_
+            ], axis=0)
+            fi = pd.Series(abs(coefs), index=feature_names)
+            fi.index = [FEATURE_LABELS.get(f, f) for f in fi.index]
             st.bar_chart(fi.sort_values(ascending=False).head(10)[::-1])
 
     # Actions
