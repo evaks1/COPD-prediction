@@ -170,6 +170,39 @@ st.markdown("""
     text-align: center; color: #94a3b8; font-size: 0.72rem;
     padding: 24px 0 12px; border-top: 1px solid #e2e8f0; margin-top: 32px;
   }
+
+  /* ── Consent gate ── */
+  .consent-gate {
+    background: #ffffff;
+    border: 2px solid #cbd5e1;
+    border-radius: 16px;
+    padding: 28px 30px;
+    margin: 24px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  }
+  .consent-gate h2 {
+    color: #1e293b; font-size: 1.15rem; font-weight: 800;
+    margin: 0 0 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .consent-gate ul {
+    margin: 0 0 18px; padding-left: 20px;
+  }
+  .consent-gate ul li {
+    color: #475569; font-size: 0.9rem; margin-bottom: 8px; line-height: 1.5;
+  }
+  .consent-disclaimer {
+    background: #fff7ed;
+    border: 1.5px solid #fed7aa;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+  }
+  .consent-disclaimer p {
+    color: #9a3412; font-size: 0.85rem; margin: 0; line-height: 1.6;
+  }
+  .consent-disclaimer strong {
+    color: #7c2d12;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -224,6 +257,55 @@ else:
       breathing test. It should take about 5 minutes.</p>
     </div>
     """, unsafe_allow_html=True)
+
+# ── Consent gate ─────────────────────────────────────────────────────
+consent_key = f"consent_given_{prefill_id or 'anon'}"
+if consent_key not in st.session_state:
+    st.session_state[consent_key] = False
+
+if not st.session_state[consent_key]:
+    st.markdown("""
+    <div class="consent-gate">
+      <h2>🔒 Before you begin — your data &amp; privacy</h2>
+      <ul>
+        <li><strong>What we collect:</strong> Symptoms, breathing difficulties, smoking history,
+        and lifestyle information you enter in this questionnaire.</li>
+        <li><strong>Who sees it:</strong> Only your doctor and care team at this practice.
+        Your information is not shared with third parties.</li>
+        <li><strong>Why we ask:</strong> To help your doctor prepare for your appointment.
+        This questionnaire <em>does not</em> produce a diagnosis.</li>
+      </ul>
+      <div class="consent-disclaimer">
+        <p><strong>Important:</strong> This is an informational screening tool only.
+        It does not provide a medical diagnosis or replace a clinical consultation.
+        All medical decisions are made exclusively by your doctor.</p>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    agreed = st.checkbox(
+        "I understand and agree to share my health information with my care team for this appointment.",
+        value=False,
+        key="consent_checkbox",
+    )
+    proceed = st.button(
+        "Continue to questionnaire →",
+        disabled=not agreed,
+        use_container_width=True,
+        type="primary",
+    )
+    if proceed and agreed:
+        st.session_state[consent_key] = True
+        st.rerun()
+
+    st.markdown("""
+    <div class="patient-footer">
+      Northside Family Practice · Powered by
+      <span style="color:#f97316; font-weight:700;">GSK</span> COPD AI Programme ·
+      Your data is handled securely and used only by your care team.
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
 
 # ── Progress tracker (static — updates on submit) ─────────────────────
 st.markdown("""

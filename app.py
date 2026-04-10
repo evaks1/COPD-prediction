@@ -29,12 +29,12 @@ model, threshold, feature_names = load_model()
 def get_risk(patient):
     # Confirmed COPD patients bypass the screening model entirely
     if patient.get("confirmed_copd"):
-        return None, "Confirmed COPD", "#7c3aed", "#f3e8ff", "#e9d5ff"
+        return None, "COPD Previously Diagnosed", "#7c3aed", "#f3e8ff", "#e9d5ff"
     row   = build_single_patient_row(patient["model_inputs"])
     proba = float(model.predict_proba(row[feature_names].values)[0, 1])
-    if proba >= threshold: return proba, "Refer",    "#dc2626", "#fee2e2", "#fecaca"
-    elif proba >= 0.35:    return proba, "Monitor",  "#b45309", "#fef9c3", "#fde68a"
-    else:                  return proba, "Low Risk", "#16a34a", "#dcfce7", "#bbf7d0"
+    if proba >= threshold: return proba, "High — Physician Review Needed", "#dc2626", "#fee2e2", "#fecaca"
+    elif proba >= 0.35:    return proba, "Moderate — Monitor Closely",     "#b45309", "#fef9c3", "#fde68a"
+    else:                  return proba, "Low",                            "#16a34a", "#dcfce7", "#bbf7d0"
 
 if "patient_risks" not in st.session_state:
     st.session_state["patient_risks"] = {p["id"]: get_risk(p) for p in FAKE_PATIENTS}
@@ -257,10 +257,10 @@ for col, (val, lbl, color) in zip(
     [sc1, sc2, sc3, sc4, sc5],
     [
         (str(len(FAKE_PATIENTS)), "Today's Patients", "#1e3a5c"),
-        (str(risks.count("Low Risk")), "Low Risk", "#16a34a"),
-        (str(risks.count("Monitor")), "Monitor", "#b45309"),
-        (str(risks.count("Refer")), "Refer for Spirometry", "#dc2626"),
-        (str(risks.count("Confirmed COPD")), "Confirmed COPD", "#7c3aed"),
+        (str(risks.count("Low")), "Low", "#16a34a"),
+        (str(risks.count("Moderate — Monitor Closely")), "Moderate — Monitor Closely", "#b45309"),
+        (str(risks.count("High — Physician Review Needed")), "High — Physician Review Needed", "#dc2626"),
+        (str(risks.count("COPD Previously Diagnosed")), "COPD Previously Diagnosed", "#7c3aed"),
     ]
 ):
     with col:
@@ -277,14 +277,13 @@ st.markdown('<div class="section-lbl">Today\'s Patient List — Monday, 23 March
             unsafe_allow_html=True)
 
 fc1, fc2, _ = st.columns([1, 1, 3])
-filter_risk = fc1.selectbox("Risk", ["All", "Refer", "Monitor", "Low Risk", "Confirmed COPD"],
-                             label_visibility="collapsed")
+filter_risk = fc1.selectbox("COPD Risk Indicators", ["All", "High — Physician Review Needed", "Moderate — Monitor Closely", "Low", "COPD Previously Diagnosed"])
 filter_gp   = fc2.selectbox("GP",   ["All GPs", "Dr. A. Patel", "Dr. S. Thompson"],
                              label_visibility="collapsed")
 
 st.markdown("""
 <div class="tbl-head" style="display:grid; grid-template-columns:46px 2fr 2fr 1fr 1fr;">
-  <div></div><div>Patient</div><div>Visit reason</div><div>COPD Risk</div><div>Status</div>
+  <div></div><div>Patient</div><div>Visit reason</div><div>COPD Risk Indicators</div><div>Status</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -298,10 +297,17 @@ for p in FAKE_PATIENTS:
 
     confirmed = p.get("confirmed_copd", False)
     badge_class = {
-        "Low Risk": "badge-low", "Monitor": "badge-monitor",
-        "Refer": "badge-refer", "Confirmed COPD": "badge-copd",
+        "Low": "badge-low",
+        "Moderate — Monitor Closely": "badge-monitor",
+        "High — Physician Review Needed": "badge-refer",
+        "COPD Previously Diagnosed": "badge-copd",
     }[risk_level]
-    risk_icon = {"Low Risk": "🟢", "Monitor": "🟡", "Refer": "🔴", "Confirmed COPD": "✅"}[risk_level]
+    risk_icon = {
+        "Low": "🟢",
+        "Moderate — Monitor Closely": "🟡",
+        "High — Physician Review Needed": "🔴",
+        "COPD Previously Diagnosed": "✅",
+    }[risk_level]
     prob_line = (
         '<div style="color:#7c3aed; font-size:0.72rem; margin-top:3px; font-weight:600;">COPD diagnosed</div>'
         if confirmed else
@@ -310,8 +316,10 @@ for p in FAKE_PATIENTS:
 
     row_col, btn_col = st.columns([7, 1])
     accent_class = {
-        "Low Risk": "pt-row-low", "Monitor": "pt-row-monitor",
-        "Refer": "pt-row-refer", "Confirmed COPD": "pt-row-copd",
+        "Low": "pt-row-low",
+        "Moderate — Monitor Closely": "pt-row-monitor",
+        "High — Physician Review Needed": "pt-row-refer",
+        "COPD Previously Diagnosed": "pt-row-copd",
     }[risk_level]
     with row_col:
         st.markdown(f"""

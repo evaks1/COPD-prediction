@@ -234,7 +234,7 @@ else:
 # Confirmed COPD patients bypass the screening probability entirely
 if confirmed_copd:
     proba = 1.0
-    rl = "Confirmed COPD"
+    rl = "COPD Previously Diagnosed"
 
 predicted = int(proba >= threshold)
 
@@ -264,31 +264,31 @@ if sev_model is not None and proba >= threshold:
 # Risk colours (all light-theme)
 if confirmed_copd:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Confirmed COPD", "#7c3aed", "#faf5ff", "#e9d5ff", "#faf5ff", "#e9d5ff", "#4c1d95"
+        "COPD Previously Diagnosed", "#7c3aed", "#faf5ff", "#e9d5ff", "#faf5ff", "#e9d5ff", "#4c1d95"
 elif proba >= threshold:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Refer", "#dc2626", "#fff1f2", "#fecaca", "#fff1f2", "#fecaca", "#7f1d1d"
+        "High — Physician Review Needed", "#dc2626", "#fff1f2", "#fecaca", "#fff1f2", "#fecaca", "#7f1d1d"
 elif proba >= 0.35:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Monitor", "#b45309", "#fefce8", "#fde68a", "#fefce8", "#fde68a", "#713f12"
+        "Moderate — Monitor Closely", "#b45309", "#fefce8", "#fde68a", "#fefce8", "#fde68a", "#713f12"
 else:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
-        "Low Risk", "#16a34a", "#f0fdf4", "#bbf7d0", "#f0fdf4", "#bbf7d0", "#14532d"
+        "Low", "#16a34a", "#f0fdf4", "#bbf7d0", "#f0fdf4", "#bbf7d0", "#14532d"
 
 # ── Alert strip ────────────────────────────────────────────────────────
 if confirmed_copd:
     st.markdown(f"""
     <div class="alert-strip" style="background:#faf5ff; border-color:#e9d5ff; color:#4c1d95;">
-      ✅ <strong>Confirmed COPD:</strong> {patient['name']} has a documented COPD diagnosis (J44).
+      ✅ <strong>COPD Previously Diagnosed:</strong> {patient['name']} has a documented COPD diagnosis (J44).
       Management per GOLD guidelines. Screening model not applicable.
     </div>
     """, unsafe_allow_html=True)
 elif predicted:
     st.markdown(f"""
     <div class="alert-strip">
-      ⚠️ <strong>COPD AI Alert:</strong> {patient['name']} is flagged for spirometry referral —
+      ⚠️ <strong>COPD AI Signal:</strong> {patient['name']} shows high COPD risk indicators —
       <strong>{rl}</strong> ({proba*100:.0f}% probability).
-      Spirometry referral is recommended.
+      Physician clinical assessment is advised.
     </div>
     """, unsafe_allow_html=True)
 
@@ -435,7 +435,7 @@ with ai_col:
           <div style="display:flex; align-items:flex-end; gap:14px;">
             <div class="risk-big" style="color:{rc}; font-size:2rem;">✅</div>
             <div>
-              <div class="risk-name" style="color:{rc};">Confirmed COPD</div>
+              <div class="risk-name" style="color:{rc};">COPD Previously Diagnosed</div>
               <div style="font-size:0.74rem; color:#64748b;">Diagnosed J44 · GOLD Stage 2 (Moderate)</div>
             </div>
           </div>
@@ -518,10 +518,10 @@ with ai_col:
 
     # Recommendation
     rec_texts = {
-        "Low Risk":       "✅ No immediate action needed. Reassess in 12 months or if symptoms develop.",
-        "Monitor":        "⚠️ Consider spirometry at next visit. Direct patient to complete the symptom questionnaire.",
-        "Refer":          "🔴 Spirometry referral recommended. Discuss with patient today and send questionnaire link.",
-        "Confirmed COPD": "📋 Continue GOLD-guided management. Review inhaler technique, exacerbation action plan, and pulmonary rehabilitation eligibility.",
+        "Low":                             "✅ No immediate action needed. Reassess in 12 months or if symptoms develop.",
+        "Moderate — Monitor Closely":      "⚠️ Consider spirometry at next visit. Direct patient to complete the symptom questionnaire.",
+        "High — Physician Review Needed":  "🔴 High COPD risk indicators detected. Physician review of clinical signs is advised. Consider discussing spirometry with the patient.",
+        "COPD Previously Diagnosed":       "📋 Continue GOLD-guided management. Review inhaler technique, exacerbation action plan, and pulmonary rehabilitation eligibility.",
     }
     st.markdown(f"""
     <div class="rec-box" style="background:{rec_bg}; border-color:{rec_border}; color:{rec_text};">
@@ -530,7 +530,7 @@ with ai_col:
     """, unsafe_allow_html=True)
 
     # SHAP
-    with st.expander("🔍 Key Contributing Risk Factors", expanded=(rl in ("Refer", "Confirmed COPD"))):
+    with st.expander("🔍 Key Contributing Risk Factors", expanded=(rl in ("High — Physician Review Needed", "COPD Previously Diagnosed"))):
         try:
             # CalibratedClassifierCV wrapping ImbPipeline(LR) — average coefs across folds
             coefs = np.mean([
