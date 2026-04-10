@@ -39,6 +39,14 @@ def get_risk(patient):
 if "patient_risks" not in st.session_state:
     st.session_state["patient_risks"] = {p["id"]: get_risk(p) for p in FAKE_PATIENTS}
 
+# Splits compound label → (short display tier, recommendation text)
+TIER_SPLIT = {
+    "High — Physician Review Needed":  ("High",                    "Physician Review Needed"),
+    "Moderate — Monitor Closely":      ("Moderate",                "Monitor Closely"),
+    "Low":                             ("Low",                     "—"),
+    "COPD Previously Diagnosed":       ("COPD Previously Diagnosed", "COPD confirmed"),
+}
+
 # ── CSS (light doctor theme) ─────────────────────────────────────────
 st.markdown("""
 <style>
@@ -258,9 +266,9 @@ for col, (val, lbl, color) in zip(
     [
         (str(len(FAKE_PATIENTS)), "Today's Patients", "#1e3a5c"),
         (str(risks.count("Low")), "Low", "#16a34a"),
-        (str(risks.count("Moderate — Monitor Closely")), "Moderate — Monitor Closely", "#b45309"),
-        (str(risks.count("High — Physician Review Needed")), "High — Physician Review Needed", "#dc2626"),
-        (str(risks.count("COPD Previously Diagnosed")), "COPD Previously Diagnosed", "#7c3aed"),
+        (str(risks.count("Moderate — Monitor Closely")), "Moderate", "#b45309"),
+        (str(risks.count("High — Physician Review Needed")), "High", "#dc2626"),
+        (str(risks.count("COPD Previously Diagnosed")), "COPD Diagnosed", "#7c3aed"),
     ]
 ):
     with col:
@@ -277,20 +285,24 @@ st.markdown('<div class="section-lbl">Today\'s Patient List — Monday, 23 March
             unsafe_allow_html=True)
 
 fc1, fc2, _ = st.columns([1, 1, 3])
-filter_risk = fc1.selectbox("COPD Risk Indicators", ["All", "High — Physician Review Needed", "Moderate — Monitor Closely", "Low", "COPD Previously Diagnosed"])
+filter_risk = fc1.selectbox("Risk Level", ["All", "High", "Moderate", "Low", "COPD Previously Diagnosed"],
+                             label_visibility="collapsed")
 filter_gp   = fc2.selectbox("GP",   ["All GPs", "Dr. A. Patel", "Dr. S. Thompson"],
                              label_visibility="collapsed")
 
-st.markdown("""
-<div class="tbl-head" style="display:grid; grid-template-columns:46px 2fr 2fr 1fr 1fr;">
-  <div></div><div>Patient</div><div>Visit reason</div><div>COPD Risk Indicators</div><div>Status</div>
+hdr_col, _ = st.columns([7, 1])
+with hdr_col:
+    st.markdown("""
+<div class="tbl-head" style="display:grid; grid-template-columns:46px 2fr 2fr 1fr 1fr; gap:14px;">
+  <div></div><div>Patient</div><div>Visit Reason</div><div>COPD Risk Indicators</div><div>Clinical Signal</div>
 </div>
 """, unsafe_allow_html=True)
 
 for p in FAKE_PATIENTS:
     proba, risk_level, risk_color, risk_bg, risk_border = \
         st.session_state["patient_risks"][p["id"]]
-    if filter_risk != "All" and risk_level != filter_risk:
+    short_tier, recommendation = TIER_SPLIT[risk_level]
+    if filter_risk != "All" and short_tier != filter_risk:
         continue
     if filter_gp != "All GPs" and p["gp"] != filter_gp:
         continue
@@ -308,11 +320,6 @@ for p in FAKE_PATIENTS:
         "High — Physician Review Needed": "🔴",
         "COPD Previously Diagnosed": "✅",
     }[risk_level]
-    prob_line = (
-        '<div style="color:#7c3aed; font-size:0.72rem; margin-top:3px; font-weight:600;">COPD diagnosed</div>'
-        if confirmed else
-        f'<div style="color:#94a3b8; font-size:0.72rem; margin-top:3px; text-align:left;">{proba*100:.0f}% probability</div>'
-    )
 
     row_col, btn_col = st.columns([7, 1])
     accent_class = {
@@ -332,10 +339,9 @@ for p in FAKE_PATIENTS:
           </div>
           <div style="color:#475569; font-size:0.83rem;">{p['reason_for_visit']}</div>
           <div>
-            <span class="badge {badge_class}">{risk_icon} {risk_level}</span>
-            {prob_line}
+            <span class="badge {badge_class}">{risk_icon} {short_tier}</span>
           </div>
-          <div><span class="tag-pill">{p['tag']}</span></div>
+          <div><span class="tag-pill">{recommendation}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
