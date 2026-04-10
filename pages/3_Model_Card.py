@@ -160,7 +160,7 @@ st.markdown("""
   </div>
   <div>
     <span class="mc-badge badge-blue">v2.1 · March 2026</span>
-    <span class="mc-badge badge-green">Logistic Regression + Kaggle Augmentation</span>
+    <span class="mc-badge badge-green">Logistic Regression · No External Augmentation</span>
     <span class="mc-badge badge-orange">GOLD Spirometry Label</span>
     <span class="mc-badge badge-purple">Research Prototype</span>
     <span class="mc-badge badge-red">Not for clinical deployment</span>
@@ -172,7 +172,7 @@ st.markdown("""
 # ROW 1: Key metrics
 # ══════════════════════════════════════════════════════════════
 st.markdown("### Key Performance Metrics")
-st.caption("Evaluated on a held-out test set of 2,000 patients (20% stratified split)")
+st.caption("Evaluated on a held-out test set of 1,990 patients (20% stratified split)")
 
 m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
 metric_display = [
@@ -204,7 +204,7 @@ st.info("⭐ **Sensitivity (recall) is the primary optimisation target.** For a 
 col_cm, col_gauge, col_thresh = st.columns([1.4, 1, 1.2])
 
 with col_cm:
-    st.markdown('<div class="card"><div class="card-title">🔢 Confusion Matrix (test set, n=2,000)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><div class="card-title">🔢 Confusion Matrix (test set, n=1,990)</div>', unsafe_allow_html=True)
     cm_fig = go.Figure(go.Heatmap(
         z=[[TN, FP], [FN, TP]],
         x=["Predicted: No COPD", "Predicted: COPD"],

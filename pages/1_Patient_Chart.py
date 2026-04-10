@@ -452,7 +452,7 @@ with ai_col:
           <div style="display:flex; align-items:flex-end; gap:14px;">
             <div class="risk-big" style="color:{rc};">{proba*100:.0f}%</div>
             <div>
-              <div class="risk-name" style="color:{rc};">{rl} Risk</div>
+              <div class="risk-name" style="color:{rc};">{rl}</div>
               <div style="font-size:0.74rem; color:#64748b;">COPD probability</div>
             </div>
           </div>
@@ -460,7 +460,7 @@ with ai_col:
             <div class="prob-bar-fill" style="background:{rc}; width:{proba*100:.1f}%;"></div>
           </div>
           <div style="font-size:0.72rem; color:#94a3b8;">
-            Threshold {threshold:.2f} · LR · Sensitivity ≥91% · GOLD Standard
+            Threshold {threshold:.2f} · LR · Sensitivity 88.9% · GOLD Standard
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -577,8 +577,8 @@ with ai_col:
     st.markdown('<div style="color:#64748b; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Actions</div>', unsafe_allow_html=True)
     a1, a2 = st.columns(2)
     with a1:
-        if st.button("🫁 Refer Spirometry", use_container_width=True):
-            st.success(f"Referral created for {patient['name']}.")
+        if st.button("🫁 Request Spirometry", use_container_width=True):
+            st.success(f"Spirometry request created for {patient['name']}.")
     with a2:
         if st.button("📩 Patient Form", use_container_width=True):
             st.session_state["prefill_patient_id"] = patient["id"]

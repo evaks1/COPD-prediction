@@ -214,7 +214,7 @@ with st.sidebar:
       Powered by<br>
       <span style='color:#f97316; font-weight:800; font-size:0.95rem;'>GSK</span>
       <span style='color:#94a3b8;'> COPD AI Programme</span><br>
-      <span style='color:#64748b;'>Sensitivity ≥91% · GOLD Standard</span>
+      <span style='color:#64748b;'>Sensitivity 88.9% · GOLD Standard</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -238,7 +238,7 @@ st.markdown("""
 
 # ── Alert banner ──────────────────────────────────────────────────────
 high_risk = [p for p in FAKE_PATIENTS
-             if st.session_state["patient_risks"][p["id"]][1] == "Refer"
+             if st.session_state["patient_risks"][p["id"]][1] == "High — Physician Review Needed"
              and not p.get("confirmed_copd")]
 if high_risk:
     names = ", ".join(p["name"] for p in high_risk)
@@ -246,7 +246,7 @@ if high_risk:
     <div class="alert-banner">
       <span style="font-size:1.3rem;">⚠️</span>
       <div><strong>{len(high_risk)} patient(s) flagged today:</strong>
-      {names} — spirometry referral recommended.</div>
+      {names} — physician review advised.</div>
     </div>
     """, unsafe_allow_html=True)
 
