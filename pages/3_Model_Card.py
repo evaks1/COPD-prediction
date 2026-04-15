@@ -505,7 +505,7 @@ with lim_col:
         ("🔬", "No post-bronchodilator data",
          "True GOLD standard requires post-bronchodilator FEV₁/FVC. This dataset does not distinguish pre/post bronchodilator measurements."),
         ("📊", "Training prevalence mismatch",
-         "The training cohort has a 76.4% COPD+ prevalence because all patients in the dataset underwent spirometry — a pre-selected, high-suspicion group. SMOTE rebalances training folds to 50/50; Platt scaling recalibrates output probabilities to the observed training distribution. Both the optimised threshold and predicted probabilities reflect this prevalence. In a real unscreened primary care population (estimated COPD prevalence 8–15%), predicted probabilities would need recalibration against local base-rate data before clinical use."),
+         "The training cohort has a 76.4% COPD+ prevalence because all patients in the dataset underwent spirometry — a pre-selected, high-suspicion group. SMOTE rebalances training folds to 50/50; Platt scaling recalibrates output probabilities to the observed training distribution. Both the optimised threshold and predicted probabilities reflect this prevalence. In real-world Spanish primary care, undiagnosed COPD prevalence among eligible patients is approximately 9.1% (derived from EPISCAN II: 11.8% COPD prevalence in adults ≥40 × 74.7% underdiagnosis rate; Soriano et al., Arch Bronconeumol 2021 + INE 2025). At this prevalence, PPV drops substantially and predicted probabilities would need recalibration against local base-rate data before clinical use."),
     ]
     for icon, title, desc in limitations:
         st.markdown(f"""

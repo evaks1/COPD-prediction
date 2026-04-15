@@ -32,9 +32,9 @@ def get_risk(patient):
         return None, "COPD Previously Diagnosed", "#7c3aed", "#f3e8ff", "#e9d5ff"
     row   = build_single_patient_row(patient["model_inputs"])
     proba = float(model.predict_proba(row[feature_names].values)[0, 1])
-    if proba >= threshold: return proba, "High — Physician Review Needed", "#dc2626", "#fee2e2", "#fecaca"
-    elif proba >= 0.35:    return proba, "Moderate — Monitor Closely",     "#b45309", "#fef9c3", "#fde68a"
-    else:                  return proba, "Low",                            "#16a34a", "#dcfce7", "#bbf7d0"
+    if proba >= 0.74:    return proba, "High — Physician Review Needed", "#dc2626", "#fee2e2", "#fecaca"
+    elif proba >= 0.675: return proba, "Moderate — Monitor Closely",     "#b45309", "#fef9c3", "#fde68a"
+    else:                return proba, "Low",                            "#16a34a", "#dcfce7", "#bbf7d0"
 
 if "patient_risks" not in st.session_state:
     st.session_state["patient_risks"] = {p["id"]: get_risk(p) for p in FAKE_PATIENTS}

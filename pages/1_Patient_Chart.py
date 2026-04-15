@@ -2,7 +2,7 @@
 Patient Chart — Doctor EHR view with embedded COPD AI risk widget (light theme).
 """
 
-import os, sys
+import os, re, sys
 import joblib
 import numpy as np
 import pandas as pd
@@ -236,7 +236,7 @@ if confirmed_copd:
     proba = 1.0
     rl = "COPD Previously Diagnosed"
 
-predicted = int(proba >= threshold)
+predicted = int(proba >= 0.74)
 
 # GOLD severity estimate for high-risk patients
 gold_severity = None
@@ -261,14 +261,25 @@ if sev_model is not None and proba >= threshold:
     sev_pred = int(sev_model.predict(sev_prep)[0])
     gold_severity = severity_label(sev_pred)
 
+# ── Spirometry / diagnosis inconsistency detection (FB5) ───────────────
+_spiro_match = re.search(r'FEV1/FVC\s+([\d.]+)', patient.get("spirometry_note", ""))
+_spiro_ratio = float(_spiro_match.group(1)) if _spiro_match else None
+_has_copd_dx = patient["model_inputs"].get("has_copd_diagnosis", 0)
+spiro_inconsistency = (
+    _spiro_ratio is not None
+    and _spiro_ratio < 0.70
+    and not confirmed_copd
+    and not _has_copd_dx
+)
+
 # Risk colours (all light-theme)
 if confirmed_copd:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
         "COPD Previously Diagnosed", "#7c3aed", "#faf5ff", "#e9d5ff", "#faf5ff", "#e9d5ff", "#4c1d95"
-elif proba >= threshold:
+elif proba >= 0.74:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
         "High — Physician Review Needed", "#dc2626", "#fff1f2", "#fecaca", "#fff1f2", "#fecaca", "#7f1d1d"
-elif proba >= 0.35:
+elif proba >= 0.675:
     rl, rc, rbg, rborder, rec_bg, rec_border, rec_text = \
         "Moderate — Monitor Closely", "#b45309", "#fefce8", "#fde68a", "#fefce8", "#fde68a", "#713f12"
 else:
@@ -289,6 +300,19 @@ elif predicted:
       ⚠️ <strong>COPD AI Signal:</strong> {patient['name']} shows high COPD risk indicators —
       <strong>{rl}</strong> ({proba*100:.0f}% probability).
       Physician clinical assessment is advised.
+    </div>
+    """, unsafe_allow_html=True)
+
+# ── Data inconsistency alert (FB5) ─────────────────────────────────────
+if spiro_inconsistency:
+    st.markdown(f"""
+    <div style="background:#fffbeb; border:1px solid #fcd34d; border-left:4px solid #d97706;
+                border-radius:8px; padding:12px 18px; margin-bottom:14px;
+                color:#92400e; font-size:0.87rem;">
+      ⚠️ <strong>Data Inconsistency:</strong> Spirometry on record shows
+      <strong>FEV1/FVC {_spiro_ratio:.2f}</strong>, which is below the GOLD 2024 obstruction
+      threshold (&lt;0.70), but <strong>no COPD diagnosis is recorded</strong> in this patient's EHR.
+      Please review the clinical record and consider updating the diagnosis.
     </div>
     """, unsafe_allow_html=True)
 
